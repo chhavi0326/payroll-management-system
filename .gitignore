@@ -1,0 +1,18 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Maven wrapper generated/local files
+effective-pom
+effective-pom.xml
+runtime-classpath.txt
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
