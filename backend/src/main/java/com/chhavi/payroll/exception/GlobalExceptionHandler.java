@@ -13,31 +13,36 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmployeeNotFoundException.class)
-    public ResponseEntity<String> handleEmployeeNotFound(
-            EmployeeNotFoundException ex) {
+    public ResponseEntity<Map<String, String>> handleEmployeeNotFound(
+            EmployeeNotFoundException exception) {
 
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(ex.getMessage());
+        Map<String, String> response = new HashMap<>();
+        response.put("error", exception.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(PayrollNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handlePayrollNotFound(
+            PayrollNotFoundException exception) {
+
+        Map<String, String> response = new HashMap<>();
+        response.put("error", exception.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationErrors(
-            MethodArgumentNotValidException ex) {
+            MethodArgumentNotValidException exception) {
 
         Map<String, String> errors = new HashMap<>();
 
-        ex.getBindingResult()
+        exception.getBindingResult()
                 .getFieldErrors()
                 .forEach(error ->
-                        errors.put(
-                                error.getField(),
-                                error.getDefaultMessage()
-                        )
-                );
+                        errors.put(error.getField(), error.getDefaultMessage()));
 
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(errors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 }
