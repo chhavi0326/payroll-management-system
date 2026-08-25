@@ -1,10 +1,19 @@
 package com.chhavi.payroll.entity;
 
 import jakarta.persistence.*;
+
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "payrolls")
+@Table(
+        name = "payrolls",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_payroll_employee_period",
+                        columnNames = {"employee_id", "pay_period"}
+                )
+        }
+)
 public class Payroll {
 
     @Id
@@ -25,6 +34,9 @@ public class Payroll {
     private BigDecimal deductions;
 
     @Column(nullable = false)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+
+    @Column(nullable = false)
     private BigDecimal grossSalary;
 
     @Column(nullable = false)
@@ -32,6 +44,10 @@ public class Payroll {
 
     @Column(nullable = false)
     private String payPeriod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PayrollStatus status = PayrollStatus.DRAFT;
 
     public Payroll() {
     }
@@ -72,6 +88,14 @@ public class Payroll {
         this.deductions = deductions;
     }
 
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
+    }
+
     public BigDecimal getGrossSalary() {
         return grossSalary;
     }
@@ -94,5 +118,13 @@ public class Payroll {
 
     public void setPayPeriod(String payPeriod) {
         this.payPeriod = payPeriod;
+    }
+
+    public PayrollStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PayrollStatus status) {
+        this.status = status;
     }
 }
