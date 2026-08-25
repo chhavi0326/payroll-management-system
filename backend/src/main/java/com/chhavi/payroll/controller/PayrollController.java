@@ -7,6 +7,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.chhavi.payroll.dto.PayrollSummaryResponse;
+import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
+import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
+import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
 
 import java.util.List;
 
@@ -93,6 +97,45 @@ public class PayrollController {
 
         return ResponseEntity.ok(
                 payrollService.payPayroll(id)
+        );
+    }
+
+    // Payroll Summary By Pay Period
+    @GetMapping("/reports/summary/{payPeriod}")
+    public ResponseEntity<PayrollSummaryResponse> getPayrollSummary(
+            @PathVariable String payPeriod) {
+
+        return ResponseEntity.ok(
+                payrollService.getPayrollSummary(payPeriod)
+        );
+    }
+
+    // Employee Payroll Summary
+    @GetMapping("/reports/employee/{employeeId}")
+    public ResponseEntity<EmployeePayrollSummaryResponse> getEmployeePayrollSummary(
+            @PathVariable Long employeeId) {
+
+        return ResponseEntity.ok(
+                payrollService.getEmployeePayrollSummary(employeeId)
+        );
+    }
+
+    // Department Payroll Summary
+    @GetMapping("/reports/department/{department}")
+    public ResponseEntity<DepartmentPayrollSummaryResponse> getDepartmentPayrollSummary(
+            @PathVariable String department) {
+
+        return ResponseEntity.ok(
+                payrollService.getDepartmentPayrollSummary(department)
+        );
+    }
+
+    // Payroll Summary By Status
+    @GetMapping("/reports/status")
+    public ResponseEntity<List<PayrollStatusSummaryResponse>> getPayrollSummaryByStatus() {
+
+        return ResponseEntity.ok(
+                payrollService.getPayrollSummaryByStatus()
         );
     }
 
