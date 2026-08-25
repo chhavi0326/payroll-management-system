@@ -3,7 +3,10 @@ package com.chhavi.payroll.service;
 import com.chhavi.payroll.dto.PayrollResponse;
 import com.chhavi.payroll.entity.Employee;
 import com.chhavi.payroll.entity.Payroll;
+import com.chhavi.payroll.entity.PayrollStatus;
+import com.chhavi.payroll.exception.DuplicatePayrollException;
 import com.chhavi.payroll.exception.EmployeeNotFoundException;
+import com.chhavi.payroll.exception.InvalidPayrollStateException;
 import com.chhavi.payroll.exception.PayrollNotFoundException;
 import com.chhavi.payroll.repository.EmployeeRepository;
 import com.chhavi.payroll.repository.PayrollRepository;
@@ -17,11 +20,15 @@ public class PayrollService {
 
     private final PayrollRepository payrollRepository;
     private final EmployeeRepository employeeRepository;
+    private final PayrollCalculationService payrollCalculationService;
 
     public PayrollService(PayrollRepository payrollRepository,
-                          EmployeeRepository employeeRepository) {
+                          EmployeeRepository employeeRepository,
+                          PayrollCalculationService payrollCalculationService) {
+
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
+        this.payrollCalculationService = payrollCalculationService;
     }
 
     public PayrollResponse createPayroll(Long employeeId,
@@ -35,8 +42,36 @@ public class PayrollService {
                         new EmployeeNotFoundException(
                                 "Employee not found with id: " + employeeId));
 
-        BigDecimal grossSalary = basicSalary.add(allowances);
-        BigDecimal netSalary = grossSalary.subtract(deductions);
+        if (payrollRepository.existsByEmployeeIdAndPayPeriod(
+                employeeId, payPeriod)) {
+
+            throw new DuplicatePayrollException(
+                    "Payroll already exists for employee id "
+                            + employeeId
+                            + " for pay period "
+                            + payPeriod);
+        }
+
+        BigDecimal grossSalary =
+                payrollCalculationService.calculateGrossSalary(
+                        basicSalary,
+                        allowances
+                );
+
+        BigDecimal taxAmount =
+                payrollCalculationService.calculateTax(grossSalary);
+
+        BigDecimal netSalary =
+                payrollCalculationService.calculateNetSalary(
+                        grossSalary,
+                        taxAmount,
+                        deductions
+                );
+
+        if (netSalary.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidPayrollStateException(
+                    "Net salary cannot be negative");
+        }
 
         Payroll payroll = new Payroll();
 
@@ -44,6 +79,7 @@ public class PayrollService {
         payroll.setBasicSalary(basicSalary);
         payroll.setAllowances(allowances);
         payroll.setDeductions(deductions);
+        payroll.setTaxAmount(taxAmount);
         payroll.setGrossSalary(grossSalary);
         payroll.setNetSalary(netSalary);
         payroll.setPayPeriod(payPeriod);
@@ -84,6 +120,44 @@ public class PayrollService {
                 .toList();
     }
 
+    public PayrollResponse processPayroll(Long id) {
+
+        Payroll payroll = payrollRepository.findById(id)
+                .orElseThrow(() ->
+                        new PayrollNotFoundException(
+                                "Payroll not found with id: " + id));
+
+        if (payroll.getStatus() != PayrollStatus.DRAFT) {
+            throw new InvalidPayrollStateException(
+                    "Only DRAFT payroll can be processed");
+        }
+
+        payroll.setStatus(PayrollStatus.PROCESSED);
+
+        Payroll updatedPayroll = payrollRepository.save(payroll);
+
+        return mapToResponse(updatedPayroll);
+    }
+
+    public PayrollResponse payPayroll(Long id) {
+
+        Payroll payroll = payrollRepository.findById(id)
+                .orElseThrow(() ->
+                        new PayrollNotFoundException(
+                                "Payroll not found with id: " + id));
+
+        if (payroll.getStatus() != PayrollStatus.PROCESSED) {
+            throw new InvalidPayrollStateException(
+                    "Only PROCESSED payroll can be marked as PAID");
+        }
+
+        payroll.setStatus(PayrollStatus.PAID);
+
+        Payroll updatedPayroll = payrollRepository.save(payroll);
+
+        return mapToResponse(updatedPayroll);
+    }
+
     public void deletePayroll(Long id) {
 
         if (!payrollRepository.existsById(id)) {
@@ -109,9 +183,11 @@ public class PayrollService {
                 payroll.getBasicSalary(),
                 payroll.getAllowances(),
                 payroll.getDeductions(),
+                payroll.getTaxAmount(),
                 payroll.getGrossSalary(),
                 payroll.getNetSalary(),
-                payroll.getPayPeriod()
+                payroll.getPayPeriod(),
+                payroll.getStatus()
         );
     }
 }

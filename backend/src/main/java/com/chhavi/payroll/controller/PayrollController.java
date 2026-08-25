@@ -76,6 +76,26 @@ public class PayrollController {
         );
     }
 
+    // Process Payroll
+    @PutMapping("/{id}/process")
+    public ResponseEntity<PayrollResponse> processPayroll(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                payrollService.processPayroll(id)
+        );
+    }
+
+    // Mark Payroll as Paid
+    @PutMapping("/{id}/pay")
+    public ResponseEntity<PayrollResponse> payPayroll(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                payrollService.payPayroll(id)
+        );
+    }
+
     // Delete Payroll
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePayroll(

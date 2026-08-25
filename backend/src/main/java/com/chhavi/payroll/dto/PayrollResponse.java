@@ -1,5 +1,7 @@
 package com.chhavi.payroll.dto;
 
+import com.chhavi.payroll.entity.PayrollStatus;
+
 import java.math.BigDecimal;
 
 public class PayrollResponse {
@@ -11,9 +13,11 @@ public class PayrollResponse {
     private BigDecimal basicSalary;
     private BigDecimal allowances;
     private BigDecimal deductions;
+    private BigDecimal taxAmount;
     private BigDecimal grossSalary;
     private BigDecimal netSalary;
     private String payPeriod;
+    private PayrollStatus status;
 
     public PayrollResponse() {
     }
@@ -26,9 +30,11 @@ public class PayrollResponse {
             BigDecimal basicSalary,
             BigDecimal allowances,
             BigDecimal deductions,
+            BigDecimal taxAmount,
             BigDecimal grossSalary,
             BigDecimal netSalary,
-            String payPeriod) {
+            String payPeriod,
+            PayrollStatus status) {
 
         this.id = id;
         this.employeeId = employeeId;
@@ -37,9 +43,11 @@ public class PayrollResponse {
         this.basicSalary = basicSalary;
         this.allowances = allowances;
         this.deductions = deductions;
+        this.taxAmount = taxAmount;
         this.grossSalary = grossSalary;
         this.netSalary = netSalary;
         this.payPeriod = payPeriod;
+        this.status = status;
     }
 
     public Long getId() {
@@ -70,6 +78,10 @@ public class PayrollResponse {
         return deductions;
     }
 
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
     public BigDecimal getGrossSalary() {
         return grossSalary;
     }
@@ -80,5 +92,9 @@ public class PayrollResponse {
 
     public String getPayPeriod() {
         return payPeriod;
+    }
+
+    public PayrollStatus getStatus() {
+        return status;
     }
 }
