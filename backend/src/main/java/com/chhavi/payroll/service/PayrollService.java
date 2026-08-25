@@ -11,6 +11,10 @@ import com.chhavi.payroll.exception.PayrollNotFoundException;
 import com.chhavi.payroll.repository.EmployeeRepository;
 import com.chhavi.payroll.repository.PayrollRepository;
 import org.springframework.stereotype.Service;
+import com.chhavi.payroll.dto.PayrollSummaryResponse;
+import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
+import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
+import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -166,6 +170,148 @@ public class PayrollService {
         }
 
         payrollRepository.deleteById(id);
+    }
+
+    public PayrollSummaryResponse getPayrollSummary(String payPeriod) {
+
+        List<Object[]> result =
+                payrollRepository.getPayrollSummary(payPeriod);
+
+        Object[] summary = result.get(0);
+
+        long totalEmployees = ((Number) summary[0]).longValue();
+
+        BigDecimal totalGrossSalary = (BigDecimal) summary[1];
+        BigDecimal totalTax = (BigDecimal) summary[2];
+        BigDecimal totalDeductions = (BigDecimal) summary[3];
+        BigDecimal totalNetSalary = (BigDecimal) summary[4];
+
+        return new PayrollSummaryResponse(
+                payPeriod,
+                totalEmployees,
+                totalGrossSalary,
+                totalTax,
+                totalDeductions,
+                totalNetSalary
+        );
+    }
+
+    public EmployeePayrollSummaryResponse getEmployeePayrollSummary(
+            Long employeeId) {
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() ->
+                        new EmployeeNotFoundException(
+                                "Employee not found with id: " + employeeId));
+
+        List<Object[]> result =
+                payrollRepository.getEmployeePayrollSummary(employeeId);
+
+        Object[] summary = result.get(0);
+
+        long totalPayrolls =
+                ((Number) summary[0]).longValue();
+
+        BigDecimal totalGrossSalary =
+                (BigDecimal) summary[1];
+
+        BigDecimal totalTax =
+                (BigDecimal) summary[2];
+
+        BigDecimal totalDeductions =
+                (BigDecimal) summary[3];
+
+        BigDecimal totalNetSalary =
+                (BigDecimal) summary[4];
+
+        String employeeName =
+                employee.getFirstName() + " " + employee.getLastName();
+
+        return new EmployeePayrollSummaryResponse(
+                employee.getId(),
+                employee.getEmployeeCode(),
+                employeeName,
+                totalPayrolls,
+                totalGrossSalary,
+                totalTax,
+                totalDeductions,
+                totalNetSalary
+        );
+    }
+
+    public DepartmentPayrollSummaryResponse getDepartmentPayrollSummary(
+            String department) {
+
+        List<Object[]> result =
+                payrollRepository.getDepartmentPayrollSummary(department);
+
+        Object[] summary = result.get(0);
+
+        long totalEmployees =
+                ((Number) summary[0]).longValue();
+
+        long totalPayrolls =
+                ((Number) summary[1]).longValue();
+
+        BigDecimal totalGrossSalary =
+                (BigDecimal) summary[2];
+
+        BigDecimal totalTax =
+                (BigDecimal) summary[3];
+
+        BigDecimal totalDeductions =
+                (BigDecimal) summary[4];
+
+        BigDecimal totalNetSalary =
+                (BigDecimal) summary[5];
+
+        return new DepartmentPayrollSummaryResponse(
+                department,
+                totalEmployees,
+                totalPayrolls,
+                totalGrossSalary,
+                totalTax,
+                totalDeductions,
+                totalNetSalary
+        );
+    }
+
+    public List<PayrollStatusSummaryResponse> getPayrollSummaryByStatus() {
+
+        List<Object[]> results =
+                payrollRepository.getPayrollSummaryByStatus();
+
+        return results.stream()
+                .map(summary -> {
+
+                    PayrollStatus status =
+                            (PayrollStatus) summary[0];
+
+                    long totalPayrolls =
+                            ((Number) summary[1]).longValue();
+
+                    BigDecimal totalGrossSalary =
+                            (BigDecimal) summary[2];
+
+                    BigDecimal totalTax =
+                            (BigDecimal) summary[3];
+
+                    BigDecimal totalDeductions =
+                            (BigDecimal) summary[4];
+
+                    BigDecimal totalNetSalary =
+                            (BigDecimal) summary[5];
+
+                    return new PayrollStatusSummaryResponse(
+                            status,
+                            totalPayrolls,
+                            totalGrossSalary,
+                            totalTax,
+                            totalDeductions,
+                            totalNetSalary
+                    );
+                })
+                .toList();
     }
 
     private PayrollResponse mapToResponse(Payroll payroll) {
