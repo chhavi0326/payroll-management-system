@@ -1,16 +1,18 @@
 package com.chhavi.payroll.controller;
 
+import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
+import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
 import com.chhavi.payroll.dto.PayrollRequest;
 import com.chhavi.payroll.dto.PayrollResponse;
+import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
+import com.chhavi.payroll.dto.PayrollSummaryResponse;
+import com.chhavi.payroll.security.PayrollSecurityService;
 import com.chhavi.payroll.service.PayrollService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.chhavi.payroll.dto.PayrollSummaryResponse;
-import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
-import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
-import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
 
 import java.util.List;
 
@@ -26,6 +28,7 @@ public class PayrollController {
 
     // Create Payroll
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<PayrollResponse> createPayroll(
             @Valid @RequestBody PayrollRequest request) {
 
@@ -44,7 +47,9 @@ public class PayrollController {
 
     // Get All Payrolls
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<List<PayrollResponse>> getAllPayrolls() {
+
         return ResponseEntity.ok(
                 payrollService.getAllPayrolls()
         );
@@ -52,6 +57,7 @@ public class PayrollController {
 
     // Get Payroll By ID
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'EMPLOYEE')")
     public ResponseEntity<PayrollResponse> getPayrollById(
             @PathVariable Long id) {
 
@@ -62,9 +68,9 @@ public class PayrollController {
 
     // Get Payrolls By Employee
     @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("@payrollSecurityService.canAccessEmployeePayroll(authentication, #employeeId)")
     public ResponseEntity<List<PayrollResponse>> getPayrollsByEmployee(
             @PathVariable Long employeeId) {
-
         return ResponseEntity.ok(
                 payrollService.getPayrollsByEmployee(employeeId)
         );
@@ -72,6 +78,7 @@ public class PayrollController {
 
     // Get Payrolls By Pay Period
     @GetMapping("/period/{payPeriod}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<List<PayrollResponse>> getPayrollsByPayPeriod(
             @PathVariable String payPeriod) {
 
@@ -82,6 +89,7 @@ public class PayrollController {
 
     // Process Payroll
     @PutMapping("/{id}/process")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<PayrollResponse> processPayroll(
             @PathVariable Long id) {
 
@@ -92,6 +100,7 @@ public class PayrollController {
 
     // Mark Payroll as Paid
     @PutMapping("/{id}/pay")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<PayrollResponse> payPayroll(
             @PathVariable Long id) {
 
@@ -102,6 +111,7 @@ public class PayrollController {
 
     // Payroll Summary By Pay Period
     @GetMapping("/reports/summary/{payPeriod}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<PayrollSummaryResponse> getPayrollSummary(
             @PathVariable String payPeriod) {
 
@@ -112,6 +122,7 @@ public class PayrollController {
 
     // Employee Payroll Summary
     @GetMapping("/reports/employee/{employeeId}")
+    @PreAuthorize("@payrollSecurityService.canAccessEmployeePayroll(authentication, #employeeId)")
     public ResponseEntity<EmployeePayrollSummaryResponse> getEmployeePayrollSummary(
             @PathVariable Long employeeId) {
 
@@ -122,6 +133,7 @@ public class PayrollController {
 
     // Department Payroll Summary
     @GetMapping("/reports/department/{department}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<DepartmentPayrollSummaryResponse> getDepartmentPayrollSummary(
             @PathVariable String department) {
 
@@ -132,6 +144,7 @@ public class PayrollController {
 
     // Payroll Summary By Status
     @GetMapping("/reports/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<List<PayrollStatusSummaryResponse>> getPayrollSummaryByStatus() {
 
         return ResponseEntity.ok(
@@ -141,6 +154,7 @@ public class PayrollController {
 
     // Delete Payroll
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletePayroll(
             @PathVariable Long id) {
 
