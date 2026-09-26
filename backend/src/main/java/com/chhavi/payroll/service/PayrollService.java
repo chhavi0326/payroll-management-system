@@ -1,6 +1,11 @@
 package com.chhavi.payroll.service;
 
+import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
+import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
 import com.chhavi.payroll.dto.PayrollResponse;
+import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
+import com.chhavi.payroll.dto.PayrollSummaryResponse;
+import com.chhavi.payroll.entity.AuditAction;
 import com.chhavi.payroll.entity.Employee;
 import com.chhavi.payroll.entity.Payroll;
 import com.chhavi.payroll.entity.PayrollStatus;
@@ -10,11 +15,8 @@ import com.chhavi.payroll.exception.InvalidPayrollStateException;
 import com.chhavi.payroll.exception.PayrollNotFoundException;
 import com.chhavi.payroll.repository.EmployeeRepository;
 import com.chhavi.payroll.repository.PayrollRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import com.chhavi.payroll.dto.PayrollSummaryResponse;
-import com.chhavi.payroll.dto.EmployeePayrollSummaryResponse;
-import com.chhavi.payroll.dto.DepartmentPayrollSummaryResponse;
-import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,35 +27,45 @@ public class PayrollService {
     private final PayrollRepository payrollRepository;
     private final EmployeeRepository employeeRepository;
     private final PayrollCalculationService payrollCalculationService;
+    private final PayrollAuditService payrollAuditService;
 
-    public PayrollService(PayrollRepository payrollRepository,
-                          EmployeeRepository employeeRepository,
-                          PayrollCalculationService payrollCalculationService) {
+    public PayrollService(
+            PayrollRepository payrollRepository,
+            EmployeeRepository employeeRepository,
+            PayrollCalculationService payrollCalculationService,
+            PayrollAuditService payrollAuditService) {
 
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
         this.payrollCalculationService = payrollCalculationService;
+        this.payrollAuditService = payrollAuditService;
     }
 
-    public PayrollResponse createPayroll(Long employeeId,
-                                         BigDecimal basicSalary,
-                                         BigDecimal allowances,
-                                         BigDecimal deductions,
-                                         String payPeriod) {
+    @Transactional
+    public PayrollResponse createPayroll(
+            Long employeeId,
+            BigDecimal basicSalary,
+            BigDecimal allowances,
+            BigDecimal deductions,
+            String payPeriod) {
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() ->
                         new EmployeeNotFoundException(
-                                "Employee not found with id: " + employeeId));
+                                "Employee not found with id: " + employeeId
+                        )
+                );
 
         if (payrollRepository.existsByEmployeeIdAndPayPeriod(
-                employeeId, payPeriod)) {
+                employeeId,
+                payPeriod)) {
 
             throw new DuplicatePayrollException(
                     "Payroll already exists for employee id "
                             + employeeId
                             + " for pay period "
-                            + payPeriod);
+                            + payPeriod
+            );
         }
 
         BigDecimal grossSalary =
@@ -63,7 +75,9 @@ public class PayrollService {
                 );
 
         BigDecimal taxAmount =
-                payrollCalculationService.calculateTax(grossSalary);
+                payrollCalculationService.calculateTax(
+                        grossSalary
+                );
 
         BigDecimal netSalary =
                 payrollCalculationService.calculateNetSalary(
@@ -74,7 +88,8 @@ public class PayrollService {
 
         if (netSalary.compareTo(BigDecimal.ZERO) < 0) {
             throw new InvalidPayrollStateException(
-                    "Net salary cannot be negative");
+                    "Net salary cannot be negative"
+            );
         }
 
         Payroll payroll = new Payroll();
@@ -88,12 +103,19 @@ public class PayrollService {
         payroll.setNetSalary(netSalary);
         payroll.setPayPeriod(payPeriod);
 
-        Payroll savedPayroll = payrollRepository.save(payroll);
+        Payroll savedPayroll =
+                payrollRepository.saveAndFlush(payroll);
+
+        payrollAuditService.recordAudit(
+                savedPayroll.getId(),
+                AuditAction.CREATED
+        );
 
         return mapToResponse(savedPayroll);
     }
 
     public List<PayrollResponse> getAllPayrolls() {
+
         return payrollRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
@@ -105,86 +127,132 @@ public class PayrollService {
         Payroll payroll = payrollRepository.findById(id)
                 .orElseThrow(() ->
                         new PayrollNotFoundException(
-                                "Payroll not found with id: " + id));
+                                "Payroll not found with id: " + id
+                        )
+                );
 
         return mapToResponse(payroll);
     }
 
-    public List<PayrollResponse> getPayrollsByEmployee(Long employeeId) {
+    public List<PayrollResponse> getPayrollsByEmployee(
+            Long employeeId) {
+
         return payrollRepository.findByEmployeeId(employeeId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    public List<PayrollResponse> getPayrollsByPayPeriod(String payPeriod) {
+    public List<PayrollResponse> getPayrollsByPayPeriod(
+            String payPeriod) {
+
         return payrollRepository.findByPayPeriod(payPeriod)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
+    @Transactional
     public PayrollResponse processPayroll(Long id) {
 
         Payroll payroll = payrollRepository.findById(id)
                 .orElseThrow(() ->
                         new PayrollNotFoundException(
-                                "Payroll not found with id: " + id));
+                                "Payroll not found with id: " + id
+                        )
+                );
 
         if (payroll.getStatus() != PayrollStatus.DRAFT) {
             throw new InvalidPayrollStateException(
-                    "Only DRAFT payroll can be processed");
+                    "Only DRAFT payroll can be processed"
+            );
         }
 
         payroll.setStatus(PayrollStatus.PROCESSED);
 
-        Payroll updatedPayroll = payrollRepository.save(payroll);
+        Payroll updatedPayroll =
+                payrollRepository.saveAndFlush(payroll);
+
+        payrollAuditService.recordAudit(
+                updatedPayroll.getId(),
+                AuditAction.PROCESSED
+        );
 
         return mapToResponse(updatedPayroll);
     }
 
+    @Transactional
     public PayrollResponse payPayroll(Long id) {
 
         Payroll payroll = payrollRepository.findById(id)
                 .orElseThrow(() ->
                         new PayrollNotFoundException(
-                                "Payroll not found with id: " + id));
+                                "Payroll not found with id: " + id
+                        )
+                );
 
         if (payroll.getStatus() != PayrollStatus.PROCESSED) {
             throw new InvalidPayrollStateException(
-                    "Only PROCESSED payroll can be marked as PAID");
+                    "Only PROCESSED payroll can be marked as PAID"
+            );
         }
 
         payroll.setStatus(PayrollStatus.PAID);
 
-        Payroll updatedPayroll = payrollRepository.save(payroll);
+        Payroll updatedPayroll =
+                payrollRepository.saveAndFlush(payroll);
+
+        payrollAuditService.recordAudit(
+                updatedPayroll.getId(),
+                AuditAction.PAID
+        );
 
         return mapToResponse(updatedPayroll);
     }
 
+    @Transactional
     public void deletePayroll(Long id) {
 
-        if (!payrollRepository.existsById(id)) {
-            throw new PayrollNotFoundException(
-                    "Payroll not found with id: " + id);
-        }
+        Payroll payroll = payrollRepository.findById(id)
+                .orElseThrow(() ->
+                        new PayrollNotFoundException(
+                                "Payroll not found with id: " + id
+                        )
+                );
 
-        payrollRepository.deleteById(id);
+        Long payrollId = payroll.getId();
+
+        payrollRepository.delete(payroll);
+        payrollRepository.flush();
+
+        payrollAuditService.recordAudit(
+                payrollId,
+                AuditAction.DELETED
+        );
     }
 
-    public PayrollSummaryResponse getPayrollSummary(String payPeriod) {
+    public PayrollSummaryResponse getPayrollSummary(
+            String payPeriod) {
 
         List<Object[]> result =
                 payrollRepository.getPayrollSummary(payPeriod);
 
         Object[] summary = result.get(0);
 
-        long totalEmployees = ((Number) summary[0]).longValue();
+        long totalEmployees =
+                ((Number) summary[0]).longValue();
 
-        BigDecimal totalGrossSalary = (BigDecimal) summary[1];
-        BigDecimal totalTax = (BigDecimal) summary[2];
-        BigDecimal totalDeductions = (BigDecimal) summary[3];
-        BigDecimal totalNetSalary = (BigDecimal) summary[4];
+        BigDecimal totalGrossSalary =
+                (BigDecimal) summary[1];
+
+        BigDecimal totalTax =
+                (BigDecimal) summary[2];
+
+        BigDecimal totalDeductions =
+                (BigDecimal) summary[3];
+
+        BigDecimal totalNetSalary =
+                (BigDecimal) summary[4];
 
         return new PayrollSummaryResponse(
                 payPeriod,
@@ -196,16 +264,22 @@ public class PayrollService {
         );
     }
 
-    public EmployeePayrollSummaryResponse getEmployeePayrollSummary(
-            Long employeeId) {
+    public EmployeePayrollSummaryResponse
+    getEmployeePayrollSummary(Long employeeId) {
 
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() ->
-                        new EmployeeNotFoundException(
-                                "Employee not found with id: " + employeeId));
+        Employee employee =
+                employeeRepository.findById(employeeId)
+                        .orElseThrow(() ->
+                                new EmployeeNotFoundException(
+                                        "Employee not found with id: "
+                                                + employeeId
+                                )
+                        );
 
         List<Object[]> result =
-                payrollRepository.getEmployeePayrollSummary(employeeId);
+                payrollRepository.getEmployeePayrollSummary(
+                        employeeId
+                );
 
         Object[] summary = result.get(0);
 
@@ -225,7 +299,9 @@ public class PayrollService {
                 (BigDecimal) summary[4];
 
         String employeeName =
-                employee.getFirstName() + " " + employee.getLastName();
+                employee.getFirstName()
+                        + " "
+                        + employee.getLastName();
 
         return new EmployeePayrollSummaryResponse(
                 employee.getId(),
@@ -239,11 +315,13 @@ public class PayrollService {
         );
     }
 
-    public DepartmentPayrollSummaryResponse getDepartmentPayrollSummary(
-            String department) {
+    public DepartmentPayrollSummaryResponse
+    getDepartmentPayrollSummary(String department) {
 
         List<Object[]> result =
-                payrollRepository.getDepartmentPayrollSummary(department);
+                payrollRepository.getDepartmentPayrollSummary(
+                        department
+                );
 
         Object[] summary = result.get(0);
 
@@ -276,7 +354,8 @@ public class PayrollService {
         );
     }
 
-    public List<PayrollStatusSummaryResponse> getPayrollSummaryByStatus() {
+    public List<PayrollStatusSummaryResponse>
+    getPayrollSummaryByStatus() {
 
         List<Object[]> results =
                 payrollRepository.getPayrollSummaryByStatus();
@@ -314,12 +393,16 @@ public class PayrollService {
                 .toList();
     }
 
-    private PayrollResponse mapToResponse(Payroll payroll) {
+    private PayrollResponse mapToResponse(
+            Payroll payroll) {
 
-        Employee employee = payroll.getEmployee();
+        Employee employee =
+                payroll.getEmployee();
 
         String employeeName =
-                employee.getFirstName() + " " + employee.getLastName();
+                employee.getFirstName()
+                        + " "
+                        + employee.getLastName();
 
         return new PayrollResponse(
                 payroll.getId(),
