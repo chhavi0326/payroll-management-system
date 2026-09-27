@@ -7,6 +7,7 @@ import com.chhavi.payroll.dto.PayrollStatusSummaryResponse;
 import com.chhavi.payroll.dto.PayrollSummaryResponse;
 import com.chhavi.payroll.entity.AuditAction;
 import com.chhavi.payroll.entity.Employee;
+import com.chhavi.payroll.entity.NotificationType;
 import com.chhavi.payroll.entity.Payroll;
 import com.chhavi.payroll.entity.PayrollStatus;
 import com.chhavi.payroll.exception.DuplicatePayrollException;
@@ -28,17 +29,20 @@ public class PayrollService {
     private final EmployeeRepository employeeRepository;
     private final PayrollCalculationService payrollCalculationService;
     private final PayrollAuditService payrollAuditService;
+    private final NotificationService notificationService;
 
     public PayrollService(
             PayrollRepository payrollRepository,
             EmployeeRepository employeeRepository,
             PayrollCalculationService payrollCalculationService,
-            PayrollAuditService payrollAuditService) {
+            PayrollAuditService payrollAuditService,
+            NotificationService notificationService) {
 
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
         this.payrollCalculationService = payrollCalculationService;
         this.payrollAuditService = payrollAuditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -178,6 +182,14 @@ public class PayrollService {
                 AuditAction.PROCESSED
         );
 
+        notificationService.createNotification(
+                updatedPayroll.getEmployee(),
+                NotificationType.PAYROLL_PROCESSED,
+                "Your payroll for "
+                        + updatedPayroll.getPayPeriod()
+                        + " has been processed."
+        );
+
         return mapToResponse(updatedPayroll);
     }
 
@@ -205,6 +217,14 @@ public class PayrollService {
         payrollAuditService.recordAudit(
                 updatedPayroll.getId(),
                 AuditAction.PAID
+        );
+
+        notificationService.createNotification(
+                updatedPayroll.getEmployee(),
+                NotificationType.PAYROLL_PAID,
+                "Your payroll for "
+                        + updatedPayroll.getPayPeriod()
+                        + " has been marked as paid."
         );
 
         return mapToResponse(updatedPayroll);
